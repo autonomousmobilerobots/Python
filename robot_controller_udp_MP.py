@@ -101,7 +101,7 @@ information if any is detected. [color_frame] is the RGB image captured by the
 RealSense camera, [depth_frame] is the current depth frame captured by the 
 camera. [params] is the RealSense camera parameters necessary for the apriltag 
 package to calculate the pose of the tag in view."""
-def get_tag(color_frame, depth_frame, params):
+def get_tag(color_frame, params):
     ret = ""
 	#Initialize apriltage detector
  
@@ -116,7 +116,7 @@ def get_tag(color_frame, depth_frame, params):
     result = detector.detect(gray)
     num_detections = len(result)
     if num_detections==0:
-        return "no tags detected"
+        return " no tags detected"
  	
     i=0
     for detection in result:
@@ -138,15 +138,59 @@ def get_tag(color_frame, depth_frame, params):
         z_dist = pose[2, 3]
         x_dist = pose[0, 3]-math.tan(fov)*z_dist
         yaw = math.atan2(pose[1, 0],pose[0, 0])
-        ret += str(z_dist)
+        ret += str(z_dist)[0:6]
         ret += " "
-        ret += str(x_dist)
+        ret += str(x_dist)[0:6]
         ret += " "
-        ret += str(yaw)
+        ret += str(yaw)[0:6]
         ret += " "
               
         i+=1
     return ret
+
+
+
+""" worker function for udp broadcast"""
+def udp_broadcast(camera, Host_IP, UDP_Port, queue):
+    
+    try:
+
+        #configure udp port
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        
+        data = "0.1 0.1"
+        comp_dt = 0
+        queue_start=time.time()
+        data_list = ['0', '0']
+ 
+        while 1:
+            
+            if camera:  
+                # if there is new data in the queue read it
+                if not queue.empty():
+
+                    queue_start = time.time()
+                    data = queue.get()
+                    data_list = data.split() 
+                    comp_dt = float(data_list[0])
+            
+                # calculate additional delay from queue update 
+                queue_dt = time.time()-queue_start
+                total_dt = str(comp_dt + queue_dt) 
+                data_list[0] = total_dt[0:6]
+                data = ' '.join(data_list)
+            
+                #broadcast
+                s.sendto(str.encode(data), (Host_IP, UDP_Port))
+            else:
+                s.sendto(bytes([99]), (Host_IP, UDP_Port))
+
+            
+
+    finally:
+
+        #close UDP port
+        s.close()
 
 
 """ Function for the camera to be called in a separate process """
@@ -157,9 +201,9 @@ def camera_worker(Host_IP):
     Dist_UDP_Port = 8833
     Tag_UDP_Port = 8844
     
-    s_Dist = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s_Tag = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-
+    #create queues
+    tag_queue = multiprocessing.SimpleQueue()
+    dist_queue = multiprocessing.SimpleQueue()
  
     # Configure depth and color streams
     print ("waiting for camera...")
@@ -192,15 +236,28 @@ def camera_worker(Host_IP):
     height = 20    #(data[5:])
     
 
-    try:
+    #start the broadcasting processes
+    tag_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,Tag_UDP_Port, tag_queue))
+    tag_broadcast.daemon = True
+    tag_broadcast.start() 
+    
+    dist_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,Dist_UDP_Port, dist_queue)) 
+    dist_broadcast.daemon = True
+    dist_broadcast.start() 
 
+
+    try:
+        i=1
         while 1:
     
             #calculate and broadcast distance and tag
             if camera==True:
    
+                i=i+1
                 #print("Waiting for frames from camera...")
                 frames = pipeline.wait_for_frames()
+                cam_start = time.time() 
+               
                 #align frames
                 aligned_frames = align.process(frames)
                 color_frame = aligned_frames.get_color_frame()
@@ -210,20 +267,28 @@ def camera_worker(Host_IP):
                     continue
  
                 dist_data = get_distance(depth_frame, int(num_points), int(height))
-                s_Dist.sendto(str.encode(dist_data), (Host_IP, Dist_UDP_Port))
+                dist_dt = str(time.time()-cam_start)
+                dist_dt = dist_dt[0:6]
+                dist_data = dist_dt + " " + dist_data
+                dist_queue.put(dist_data)
 
-                tag_data = get_tag(color_frame, depth_frame, params)
-                s_Tag.sendto(str.encode(tag_data), (Host_IP, Tag_UDP_Port))
+                tag_data = get_tag(color_frame, params)
+                tag_dt = str(time.time()-cam_start)
+                tag_dt = tag_dt[0:6]
+                tag_data = tag_dt + " " + tag_data
+                tag_queue.put(tag_data)
+                
 
-            else: 
-                s_Dist.sendto(bytes([99]), (Host_IP, Dist_UDP_Port))
-                s_Tag.sendto(bytes([99]), (Host_IP, Tag_UDP_Port))
-   
     finally:
 
         #close UDP ports
-        s_Dist.close()
-        s_Tag.close()
+        #s_Dist.close()
+        #s_Tag.close()
+
+        tag_broadcast.terminate()
+        tag_broadcast.join()
+        dist_broadcast.terminate()
+        dist_broadcast.join()
         if camera==True:
             pipeline.stop() 
 
