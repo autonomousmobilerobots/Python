@@ -140,7 +140,7 @@ def get_tag(color_frame, params):
         yaw = math.atan2(pose[1, 0],pose[0, 0])
         ret += str(z_dist)[0:6]
         ret += " "
-        ret += str(x_dist)[0:6]
+        ret += str(-x_dist)[0:6]
         ret += " "
         ret += str(yaw)[0:6]
         ret += " "
