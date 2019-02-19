@@ -58,20 +58,18 @@ def get_ip():
 
 
 
-"""[get_distance] receives the command from the host computer regarding the 
-[num_points] to sample from the image, and [height] is the angle in degrees to 
-that the depth reading. [depth_frame] is returned from the camera, in a 640*480
-array of distance data. [num_points] is taken at regular intervals across a 
-horizontal row of the depth image. The left and the right-most points of the 
-image is always sampled, and the remaining points are interpolated across the 
-row. The distance returned is after taking average of 16 points in the region 
-specified (4*4 pixels). """
-
-
-""" try again 
-    640 pixels into 8 intervals, clipped down so there are 4x4 pixels around the point for average
-    height is middle of 480 pixels 
 """
+[get_distance] receives a RealSense depth frame and 
+returns the distance to 9 points equally spaced horizontally
+
+[depth_frame] is returned from the camera, in a 640*480 array of distance data
+640 pixels divided into 8 equal intervals, clipped down so there are 4x4 pixels 
+around the point for the average calculation
+The height is the middle of 480 pixels. 
+The distance returned is after taking average of 16 points around 
+the point specified (4*4 pixels).  
+"""
+
 def get_distance(depth_frame):
     num_points = 9
     top = 242              #480/2+2
@@ -145,9 +143,9 @@ def get_tag(color_frame, params, x_fov_rad, s_path):
 
 
 """ Worker function for udp broadcast
-    Reads data from Queue and transmits ove udp
-    Computes delay from fresh data to time of transmission
-    and adds it to the delay coming from the queue
+    Reads data from Queue and transmits over udp
+    Computes delay from fresh data to time of transmission and 
+    adds it to the delay coming from the queue
 """
 def udp_broadcast(camera, Host_IP, UDP_Port, queue):
     
