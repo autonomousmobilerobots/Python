@@ -57,35 +57,74 @@ def get_ip():
 
 
 
+""" get_depth
+    depth_frame is a 640x480 Realsense depth frame
+    x_pixel and y_pixel are the coordinates to get depth for
+    R determines the number of pixels around x,y that are used to get the average
+    R == 0 - only 1 pixel
+    R == 1 - 3x3
+    R == 2 - 5x5
+    in general (R+1+R)^2 
+
+    Returns depth reading as float
+"""
+def get_depth(depth_frame, x_pixel, y_pixel, R):
+
+    # No averaging, return distance of 1 pixel
+    if R==0:
+        return depth_frame.get_distance(x_pixel, y_pixel)
+    
+    else:
+        # check that all pixels remain within the frame
+        if x_pixel < R:
+            x_pixel=R
+        elif x_pixel > 640-R:
+            x_pixel = 640-R
+        
+        if y_pixel < R:
+            y_pixel=R
+        elif y_pixel > 480-R:
+            y_pixel = 480-R
+
+        # calculate margins 
+        left = x_pixel-R    
+        right = x_pixel+R+1 #range is exclusive of last point
+        bottom = y_pixel-R
+        top = y_pixel+R+1 
+        num_of_pixels = (R+1+R)**2
+
+        # sum and divide to get the average
+        sum = 0
+        for y in range(bottom, top):
+           for k in range(left, right):
+               sum += depth_frame.get_distance(k, y)
+        ret = sum/num_of_pixels
+
+        return ret
+
+
 
 """
 [get_distance] receives a RealSense depth frame and 
 returns the distance to 9 points equally spaced horizontally
 
 [depth_frame] is returned from the camera, in a 640*480 array of distance data
-640 pixels divided into 8 equal intervals, clipped down so there are 4x4 pixels 
-around the point for the average calculation
+640 pixels divided into 8 equal intervals
 The height is the middle of 480 pixels. 
-The distance returned is after taking average of 16 points around 
-the point specified (4*4 pixels).  
+The distance returned is after taking average of (R+1+R)^2 points around 
+the point specified.  
 """
 
 def get_distance(depth_frame):
     num_points = 9
-    top = 242              #480/2+2
-    bottom = 238           #480/2-2
-    pix_per_interval = 79  #640/(num_points-1)-1 
-    
+    Y = 240                #480/2
+    pix_per_interval = 80  #640/(num_points-1)
+    R = 1    
+
     ret = ""
     for point in range(num_points):
-        left = point*pix_per_interval+2
-        right = left+4
-        sum = 0
-        for y in range(bottom, top):
-           for k in range(left, right):
-               sum +=depth_frame.get_distance(k, y)
-        avg = sum/16
-        ret += str(avg)
+        X = point*pix_per_interval
+        ret += str(get_depth(depth_frame, X, Y, R))      
         ret += " "
     return ret
 
