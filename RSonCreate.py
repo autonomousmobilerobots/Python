@@ -133,8 +133,10 @@ def get_distance(depth_frame):
 information if any is detected. [color_frame] is the RGB image captured by the
 RealSense camera, [depth_frame] is the current depth frame captured by the 
 camera. [params] is the RealSense camera parameters necessary for the apriltag 
-package to calculate the pose of the tag in view."""
-def get_tag(color_frame, params, x_fov_rad, s_path):
+package to calculate the pose of the tag in view.
+"""
+
+def get_tag(color_frame, depth_frame, params, x_fov_rad, s_path):
     ret = ""
 	#Initialize apriltage detector
     detector = apriltag.Detector(searchpath=s_path)
@@ -146,10 +148,12 @@ def get_tag(color_frame, params, x_fov_rad, s_path):
     gray = np.array(pil_img.convert('L'))
     result = detector.detect(gray)
     num_detections = len(result)
+    
     if num_detections==0:
         return " no tags detected"
  	
     i=0
+    
     for detection in result:
         ret += str(i)
         ret += " "
@@ -158,6 +162,11 @@ def get_tag(color_frame, params, x_fov_rad, s_path):
         ret += str(id)
         ret += " "
 
+        z_depth = get_depth(depth_frame, int(x), int(y), 1)
+        px_to_m = z_depth*math.tan(x_fov_rad/2)/320
+        x_depth = (320-x)*px_to_m
+        
+
 	#Pose of the apriltags in camera view is returned from the apriltag 
 	#package as a homogeneous transform matrix. The tag position in the H 
 	#matrix is the (x, y, z) position of the center of the tag with respect 
@@ -165,18 +174,23 @@ def get_tag(color_frame, params, x_fov_rad, s_path):
 	# The third argument into the detector.detection_pose() function is the 
 	# size of the apriltags used in meters. The pose calculations are very
 	# sensitive to this value
-        pose, e0, e1 = detector.detection_pose(detection, params, 0.166)
-        z_dist = pose[2, 3]
-        x_dist = pose[0, 3]-math.tan(x_fov_rad/2)*z_dist
-        yaw = math.atan2(pose[1, 0],pose[0, 0])
-        ret += str(z_dist)[0:6]
+        #pose, e0, e1 = detector.detection_pose(detection, params, 0.166)
+        #z_dist = pose[2, 3]
+        #x_dist = pose[0, 3]-math.tan(x_fov_rad/2)*z_dist
+        #yaw = math.atan2(pose[1, 0],pose[0, 0])
+        ret += str(z_depth)[0:6]
         ret += " "
-        ret += str(-x_dist)[0:6]
+        ret += str(x_depth)[0:6]
         ret += " "
-        ret += str(yaw)[0:6]
+        ret += str(0)[0:6]
         ret += " "
               
         i+=1
+
+        #print ("depth z "+ str(id) + " " + str(z_depth)[0:6])
+        #print("pose  z " + str(id) + " " + str(z_dist)[0:6])
+        #print ("depth x "+ str(id) + " " + str(x_depth)[0:6])
+        #print("pose  x " + str(id) + " " + str(-x_dist)[0:6])
     return ret
 
 
@@ -313,9 +327,9 @@ def camera_worker(Host_IP):
                 dist_dt = dist_dt[0:6]
                 dist_data = dist_dt + " " + dist_data
                 dist_queue.put(dist_data)
-
+                
                 # Call tag function, add delay and write to queue
-                tag_data = get_tag(color_frame, params, x_fov_rad, s_path)
+                tag_data = get_tag(color_frame, depth_frame, params, x_fov_rad, s_path)
                 tag_dt = str(time.time()-cam_start)
                 tag_dt = tag_dt[0:6]
                 tag_data = tag_dt + " " + tag_data
