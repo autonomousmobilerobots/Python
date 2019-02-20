@@ -124,7 +124,7 @@ def get_distance(depth_frame):
     ret = ""
     for point in range(num_points):
         X = point*pix_per_interval
-        ret += str(get_depth(depth_frame, X, Y, R))      
+        ret += str(get_depth(depth_frame, X, Y, R))[0:6]      
         ret += " "
     return ret
 
