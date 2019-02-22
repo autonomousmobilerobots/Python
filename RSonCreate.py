@@ -28,6 +28,7 @@ def _get_demo_searchpath():
 """Function grabs the serial port mutex lock and sends [data] to 
 the [ser_port]"""
 def send_message(data, ser_port, serialLock):
+    
     #first grab mutex lock
     serialLock.acquire()
     successful = False
@@ -121,12 +122,13 @@ def get_distance(depth_frame):
     pix_per_interval = 80  #640/(num_points-1)
     R = 1    
 
-    ret = ""
+    dist_l = [""]
     for point in range(num_points):
         X = point*pix_per_interval
-        ret += str(get_depth(depth_frame, X, Y, R))[0:6]      
-        ret += " "
-    return ret
+        dist_l.append(str(get_depth(depth_frame, X, Y, R))[0:6])
+    
+    return dist_l
+
 
 
 """[get_tag] scans the current camera video image and returns the apriltag
@@ -137,7 +139,7 @@ package to calculate the pose of the tag in view.
 """
 
 def get_tag(color_frame, depth_frame, params, x_fov_rad, s_path):
-    ret = ""
+    
 	#Initialize apriltage detector
     detector = apriltag.Detector(searchpath=s_path)
 
@@ -150,22 +152,28 @@ def get_tag(color_frame, depth_frame, params, x_fov_rad, s_path):
     num_detections = len(result)
     
     if num_detections==0:
-        return " no tags detected"
+        return ["", "no tags detected"]
  	
     i=0
-    
+    tag_l = [""]
     for detection in result:
-        ret += str(i)
-        ret += " "
+        
         x, y = detection.center
         id = detection.tag_id
-        ret += str(id)
-        ret += " "
 
         z_depth = get_depth(depth_frame, int(x), int(y), 1)
         px_to_m = z_depth*math.tan(x_fov_rad/2)/320
         x_depth = (320-x)*px_to_m
         
+        tag_l.append(str(i))
+        tag_l.append(str(id))
+        tag_l.append(str(z_depth)[0:6])
+        tag_l.append(str(x_depth)[0:6])
+        tag_l.append(str(0)[0:6])
+
+        i+=1
+    
+    return tag_l
 
 	#Pose of the apriltags in camera view is returned from the apriltag 
 	#package as a homogeneous transform matrix. The tag position in the H 
@@ -178,21 +186,23 @@ def get_tag(color_frame, depth_frame, params, x_fov_rad, s_path):
         #z_dist = pose[2, 3]
         #x_dist = pose[0, 3]-math.tan(x_fov_rad/2)*z_dist
         #yaw = math.atan2(pose[1, 0],pose[0, 0])
-        ret += str(z_depth)[0:6]
-        ret += " "
-        ret += str(x_depth)[0:6]
-        ret += " "
-        ret += str(0)[0:6]
-        ret += " "
+        #ret += str(z_depth)[0:6]
+        #ret += " "
+        
+        #ret += str(x_depth)[0:6]
+        #ret += " "
+        
+        #ret += str(0)[0:6]
+        #ret += " "
               
-        i+=1
+        
 
         #print ("depth z "+ str(id) + " " + str(z_depth)[0:6])
         #print("pose  z " + str(id) + " " + str(z_dist)[0:6])
         #print ("depth x "+ str(id) + " " + str(x_depth)[0:6])
         #print("pose  x " + str(id) + " " + str(-x_dist)[0:6])
-    return ret
-
+    #return ret
+    
 
 
 """ Worker function for udp broadcast
@@ -201,16 +211,15 @@ def get_tag(color_frame, depth_frame, params, x_fov_rad, s_path):
     adds it to the delay coming from the queue
 """
 def udp_broadcast(camera, Host_IP, UDP_Port, queue):
-    
+    #print("T/D " + str(os.getpid()))
     try:
 
         #configure udp port
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         
-        data = "0.1 0.1"
         comp_dt = 0
         queue_start=time.time()
-        data_list = ['0', '0']
+        data_l = ['0', '0']
  
         while 1:
             
@@ -219,15 +228,15 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
                 if not queue.empty():
 
                     queue_start = time.time()
-                    data = queue.get()
-                    data_list = data.split() 
-                    comp_dt = float(data_list[0])
+                    data_l = queue.get()
+                    comp_dt = float(data_l[0])
+                    
             
                 # calculate additional delay from queue update 
                 queue_dt = time.time()-queue_start
                 total_dt = str(comp_dt + queue_dt) 
-                data_list[0] = total_dt[0:6]
-                data = ' '.join(data_list)
+                data_l[0] = total_dt[0:6]
+                data = ' '.join(data_l)
             
                 #broadcast
                 s.sendto(str.encode(data), (Host_IP, UDP_Port))
@@ -238,7 +247,7 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
             
 
     finally:
-
+        
         #close UDP port
         s.close()
 
@@ -249,7 +258,7 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
     Calls Tag and Dist functions and writes the data into the queue 
 """
 def camera_worker(Host_IP):
-    
+    #print("Cam " + str(os.getpid()))
     #configure UDP ports
     Dist_UDP_Port = 8833
     Tag_UDP_Port = 8844
@@ -322,22 +331,20 @@ def camera_worker(Host_IP):
                     continue
  
                 # Call distance function, add delay and write to queue
-                dist_data = get_distance(depth_frame)
+                dist_data_l = get_distance(depth_frame)
                 dist_dt = str(time.time()-cam_start)
-                dist_dt = dist_dt[0:6]
-                dist_data = dist_dt + " " + dist_data
-                dist_queue.put(dist_data)
+                dist_data_l[0] = dist_dt[0:6]
+                dist_queue.put(dist_data_l)
                 
                 # Call tag function, add delay and write to queue
-                tag_data = get_tag(color_frame, depth_frame, params, x_fov_rad, s_path)
+                tag_data_l = get_tag(color_frame, depth_frame, params, x_fov_rad, s_path)
                 tag_dt = str(time.time()-cam_start)
-                tag_dt = tag_dt[0:6]
-                tag_data = tag_dt + " " + tag_data
-                tag_queue.put(tag_data)
+                tag_data_l[0] = tag_dt[0:6]
+                tag_queue.put(tag_data_l)
 
 
     finally:
-
+        
         # Terminte broadcasting processes
         tag_broadcast.terminate()
         tag_broadcast.join()
@@ -356,6 +363,9 @@ def camera_worker(Host_IP):
     computer MATLAB toolbox and sends them to the robot, then sends the reply back to the host
 """
 def main():
+    
+    #print("Main " +str(os.getpid()))
+
     try:
         #set the output serial property for create
         ser_port = serial.Serial("/dev/ttyUSB0", baudrate=57600, timeout=0.5)
@@ -395,7 +405,7 @@ def main():
             
            # check for command from the host
             command = b''
-            dataAvail = select.select([conn],[],[],0)[0]
+            dataAvail = select.select([conn],[],[],0.001)[0]
             if dataAvail:
                 command = (conn.recv(BUFFER_SIZE))
                 
@@ -418,11 +428,12 @@ def main():
 
     finally:
         print("I was told to Stop, or something went wrong")
+        
         #close TCP connection
         conn.shutdown(1)
         conn.close()
         s.close()
-       #close the serial connection
+        #close the serial connection
         ser_port.close()
         #kill the camera process
         cam_process.terminate()
