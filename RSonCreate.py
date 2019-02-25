@@ -70,8 +70,8 @@ def get_ip():
     Returns depth reading as float
 """
 def get_depth(depth_frame, x_pixel, y_pixel, R):
-
-    # No averaging, return distance of 1 pixel
+    
+    # No averaging, return depth of 1 pixel
     if R==0:
         return depth_frame.get_distance(x_pixel, y_pixel)
     
@@ -87,21 +87,20 @@ def get_depth(depth_frame, x_pixel, y_pixel, R):
         elif y_pixel > 480-R:
             y_pixel = 480-R
 
-        # calculate margins 
+        # calculate margins for depth average
         left = x_pixel-R    
         right = x_pixel+R+1 #range is exclusive of last point
         bottom = y_pixel-R
         top = y_pixel+R+1 
-        num_of_pixels = (R+1+R)**2
+        num_of_pixels = (right-left)*(top-bottom)
 
         # sum and divide to get the average
         sum = 0
         for y in range(bottom, top):
            for k in range(left, right):
                sum += depth_frame.get_distance(k, y)
-        ret = sum/num_of_pixels
-
-        return ret
+        
+        return sum/num_of_pixels
 
 
 
@@ -109,7 +108,7 @@ def get_depth(depth_frame, x_pixel, y_pixel, R):
 [get_distance] receives a RealSense depth frame and 
 returns the distance to 9 points equally spaced horizontally
 
-[depth_frame] is returned from the camera, in a 640*480 array of distance data
+[depth_frame] is returned from the camera, in a 640*480 array of depth data
 640 pixels divided into 8 equal intervals
 The height is the middle of 480 pixels. 
 The distance returned is after taking average of (R+1+R)^2 points around 
@@ -134,91 +133,63 @@ def get_distance(depth_frame):
 """[get_tag] scans the current camera video image and returns the apriltag
 information if any is detected. [color_frame] is the RGB image captured by the
 RealSense camera, [depth_frame] is the current depth frame captured by the 
-camera. [params] is the RealSense camera parameters necessary for the apriltag 
-package to calculate the pose of the tag in view.
+camera. 
 """
 
-def get_tag(color_frame, depth_frame, params, x_fov_rad, s_path):
+def get_tag(color_frame, depth_frame, x_fov_rad, detector):
     
-	#Initialize apriltage detector
-    detector = apriltag.Detector(searchpath=s_path)
-
     #initialize image
     img = np.asanyarray(color_frame.get_data())
+    
     #convert to grayscale
     pil_img = Image.fromarray(img)
     gray = np.array(pil_img.convert('L'))
-    result = detector.detect(gray)
-    num_detections = len(result)
-    
-    if num_detections==0:
+
+    # find tags in gray image
+    tag_detections = detector.detect(gray)
+        
+    if len(tag_detections) == 0:
         return ["", "no tags detected"]
  	
-    i=0
+    # Clculate depth of detected tags
+    det = 1
     tag_l = [""]
-    for detection in result:
+    R = 1
+    for tag in tag_detections:
         
-        x, y = detection.center
-        id = detection.tag_id
-
-        z_depth = get_depth(depth_frame, int(x), int(y), 1)
+        x, y = tag.center
+        id = tag.tag_id
+        
+        z_depth = get_depth(depth_frame, int(x), int(y), R)
         px_to_m = z_depth*math.tan(x_fov_rad/2)/320
         x_depth = (320-x)*px_to_m
         
-        tag_l.append(str(i))
+        # Add to the list
+        tag_l.append(str(det))
         tag_l.append(str(id))
         tag_l.append(str(z_depth)[0:6])
         tag_l.append(str(x_depth)[0:6])
         tag_l.append(str(0)[0:6])
 
-        i+=1
+        det+=1
     
-    return tag_l
-
-	#Pose of the apriltags in camera view is returned from the apriltag 
-	#package as a homogeneous transform matrix. The tag position in the H 
-	#matrix is the (x, y, z) position of the center of the tag with respect 
-	#to the left center of the camera frame. 
-	# The third argument into the detector.detection_pose() function is the 
-	# size of the apriltags used in meters. The pose calculations are very
-	# sensitive to this value
-        #pose, e0, e1 = detector.detection_pose(detection, params, 0.166)
-        #z_dist = pose[2, 3]
-        #x_dist = pose[0, 3]-math.tan(x_fov_rad/2)*z_dist
-        #yaw = math.atan2(pose[1, 0],pose[0, 0])
-        #ret += str(z_depth)[0:6]
-        #ret += " "
-        
-        #ret += str(x_depth)[0:6]
-        #ret += " "
-        
-        #ret += str(0)[0:6]
-        #ret += " "
-              
-        
-
-        #print ("depth z "+ str(id) + " " + str(z_depth)[0:6])
-        #print("pose  z " + str(id) + " " + str(z_dist)[0:6])
-        #print ("depth x "+ str(id) + " " + str(x_depth)[0:6])
-        #print("pose  x " + str(id) + " " + str(-x_dist)[0:6])
-    #return ret
-    
+    return tag_l 
 
 
-""" Worker function for udp broadcast
-    Reads data from Queue and transmits over udp
+""" Worker function for udp broadcast called in separate process
+    Reads data from Queue and broadcasts over udp
     Computes delay from fresh data to time of transmission and 
     adds it to the delay coming from the queue
 """
 def udp_broadcast(camera, Host_IP, UDP_Port, queue):
-    #print("T/D " + str(os.getpid()))
+    
     try:
 
         #configure udp port
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         
         comp_dt = 0
-        queue_start=time.time()
+        queue_start = 0
         data_l = ['0', '0']
  
         while 1:
@@ -241,10 +212,9 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
                 #broadcast
                 s.sendto(str.encode(data), (Host_IP, UDP_Port))
             else:
-                # Tell the host there is no camera
+                # Tell the host there is no camera, and sleep a little
                 s.sendto(bytes([99]), (Host_IP, UDP_Port))
-
-            
+                time.sleep(1)
 
     finally:
         
@@ -254,18 +224,18 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
 
 """ Camera function to be called in a separate process 
     Sets up the camera stream and aligns images
-    Sets up and starts the broadcasting processes
+    Sets up and starts the UDP broadcasting processes
     Calls Tag and Dist functions and writes the data into the queue 
 """
 def camera_worker(Host_IP):
-    #print("Cam " + str(os.getpid()))
+    
     #configure UDP ports
     Dist_UDP_Port = 8833
     Tag_UDP_Port = 8844
+   
+    #Initialize apriltag detector
+    detector = apriltag.Detector(searchpath=_get_demo_searchpath())
 
-    #searchpath for Apriltag Detector
-    s_path=_get_demo_searchpath()
-    
     #create queues
     tag_queue = multiprocessing.SimpleQueue()
     dist_queue = multiprocessing.SimpleQueue()
@@ -295,7 +265,7 @@ def camera_worker(Host_IP):
         profile = pipeline.get_active_profile()
         rgb_profile = rs.video_stream_profile(profile.get_stream(rs.stream.color))
         rgb_intrinsics = rgb_profile.get_intrinsics()
-        params = [rgb_intrinsics.fx, rgb_intrinsics.fy, 0, 0]
+        #params = [rgb_intrinsics.fx, rgb_intrinsics.fy, 0, 0]
         
         # get FOV from the camera
         fov= rs.rs2_fov(rgb_intrinsics)
@@ -311,7 +281,8 @@ def camera_worker(Host_IP):
     dist_broadcast.daemon = True
     dist_broadcast.start() 
 
-    
+    dist_data_l = [""]
+    tag_data_l = [""]
     
     try:
         
@@ -337,11 +308,14 @@ def camera_worker(Host_IP):
                 dist_queue.put(dist_data_l)
                 
                 # Call tag function, add delay and write to queue
-                tag_data_l = get_tag(color_frame, depth_frame, params, x_fov_rad, s_path)
+                tag_data_l = get_tag(color_frame, depth_frame, x_fov_rad, detector)
                 tag_dt = str(time.time()-cam_start)
                 tag_data_l[0] = tag_dt[0:6]
                 tag_queue.put(tag_data_l)
-
+            
+            # No camera - sleep to reduce load
+            else:
+                time.sleep(1)
 
     finally:
         
@@ -363,18 +337,16 @@ def camera_worker(Host_IP):
     computer MATLAB toolbox and sends them to the robot, then sends the reply back to the host
 """
 def main():
-    
-    #print("Main " +str(os.getpid()))
 
     try:
-        #set the output serial property for create
+        # Set the output serial property for create
         ser_port = serial.Serial("/dev/ttyUSB0", baudrate=57600, timeout=0.5)
         print ("Serial port set!")
     except:
         print ("Serial port not connected")
         quit()
 
-    # configure communication
+    # Configure communication
     TCP_IP = get_ip()
     print('Raspberry Pi address: ' + TCP_IP)
     TCP_PORT = 8865
@@ -383,7 +355,7 @@ def main():
     serialLock = _thread.allocate_lock()
     
 
-    # start the tcp socket
+    # Start the tcp socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     s.bind((TCP_IP, TCP_PORT))
@@ -394,7 +366,7 @@ def main():
     Host_IP = addr[0]
     print ('Host Computer address: ' + Host_IP)
 
-    #start camera process  
+    # Start camera process  
     cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP,)) 
     cam_process.start() 
 
@@ -403,22 +375,22 @@ def main():
         print ("Ready for Commands!") 
         while 1:
             
-           # check for command from the host
+           # Check for command from the host
             command = b''
-            dataAvail = select.select([conn],[],[],0.001)[0]
+            dataAvail = select.select([conn],[],[],0.01)[0]
             if dataAvail:
                 command = (conn.recv(BUFFER_SIZE))
                 
                 if command == b'stop':
-                # Case where the host computer asks to stop the script 
+                # The host computer asks to stop the script 
                     quit()
 
                 else: 
-                # Case where the host computer command is meant for the iRobot
-                #write data to robot
+                # The host computer command is meant for the iRobot
+                # write data to serial port
                     send_message(command, ser_port, serialLock)
             
-            #no command
+            # No command
             else:       
                 #Read data from robot and send to Host
                 BytesToRead = ser_port.inWaiting()
