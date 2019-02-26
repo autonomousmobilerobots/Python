@@ -118,14 +118,14 @@ the point specified.
 def get_distance(depth_frame):
     num_points = 9
     Y = 240                #480/2
-    pix_per_interval = 80  #640/(num_points-1)
-    R = 1    
-
+    pix_per_interval = 79  #640/(num_points-1)-1 to get away from edges
+    R = 2   
+    
     dist_l = [""]
     for point in range(num_points):
-        X = point*pix_per_interval
+        X = point*pix_per_interval + 4
         dist_l.append(str(get_depth(depth_frame, X, Y, R))[0:6])
-    
+        
     return dist_l
 
 
@@ -154,7 +154,7 @@ def get_tag(color_frame, depth_frame, x_fov_rad, detector):
     # Clculate depth of detected tags
     det = 1
     tag_l = [""]
-    R = 1
+    R = 2
     for tag in tag_detections:
         
         x, y = tag.center
