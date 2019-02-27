@@ -16,8 +16,11 @@ from threading import *
 
 debug = False
 
-"""To make sure that the apriltag package is in the path"""
-def _get_demo_searchpath():
+
+"""
+To make sure that the apriltag package is in the path called by the Detector init
+"""
+def get_searchpath():
     
     return [
         os.path.join(os.path.dirname(__file__), '../build/lib'),
@@ -25,8 +28,10 @@ def _get_demo_searchpath():
     ]
 
 
-"""Function grabs the serial port mutex lock and sends [data] to 
-the [ser_port]"""
+"""
+send_message grabs the serial port mutex [serialLock] and sends [data] to 
+the [ser_port]
+"""
 def send_message(data, ser_port, serialLock):
     
     #first grab mutex lock
@@ -43,31 +48,33 @@ def send_message(data, ser_port, serialLock):
     serialLock.release()
 
 
-""" Returns DHCP assigned IP"""
+""" 
+get_ip returns the local DHCP assigned IP
+"""
 def get_ip():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # doesn't even have to be reachable
         s.connect(('10.255.255.255', 1))
-        TCP_IP = s.getsockname()[0]
+        IP = s.getsockname()[0]
     except:
-        TCP_IP = '127.0.1.1'
+        IP = '127.0.1.1'
     finally:
         s.close()
-    return TCP_IP
+    return IP
 
 
 
-""" get_depth
-    depth_frame is a 640x480 Realsense depth frame
-    x_pixel and y_pixel are the coordinates to get depth for
-    R determines the number of pixels around x,y that are used to get the average
-    R == 0 - only 1 pixel
-    R == 1 - 3x3
-    R == 2 - 5x5
-    in general (R+1+R)^2 
-
-    Returns depth reading as float
+"""
+get_depth calculates the average depth aaround a target pixel
+[depth_frame] is a 640x480 Realsense depth frame
+[x_pixel] and [y_pixel] are the pixel coordinates to get depth for
+[R] determines the number of pixels around x,y that are used to get the average
+R == 0 - only 1 pixel
+R == 1 - 3x3
+R == 2 - 5x5
+in general (R+1+R)^2 
+Returns depth reading as float
 """
 def get_depth(depth_frame, x_pixel, y_pixel, R):
     
@@ -105,21 +112,19 @@ def get_depth(depth_frame, x_pixel, y_pixel, R):
 
 
 """
-[get_distance] receives a RealSense depth frame and 
+get_distance receives a RealSense depth frame and 
 returns the distance to 9 points equally spaced horizontally
-
 [depth_frame] is returned from the camera, in a 640*480 array of depth data
 640 pixels divided into 8 equal intervals
 The height is the middle of 480 pixels. 
 The distance returned is after taking average of (R+1+R)^2 points around 
 the point specified.  
 """
-
 def get_distance(depth_frame):
     num_points = 9
     Y = 240                #480/2
     pix_per_interval = 79  #640/(num_points-1)-1 to get away from edges
-    R = 2   
+    R = 1                  # size of target to average, see get_depth   
     
     dist_l = [""]
     for point in range(num_points):
@@ -130,12 +135,14 @@ def get_distance(depth_frame):
 
 
 
-"""[get_tag] scans the current camera video image and returns the apriltag
-information if any is detected. [color_frame] is the RGB image captured by the
-RealSense camera, [depth_frame] is the current depth frame captured by the 
-camera. 
 """
-
+get_tag scans the current camera image and returns the apriltag
+information if any is detected. 
+[color_frame] is the RGB image captured by the RealSense camera.
+[depth_frame] is the current depth frame captured by the camera. 
+[x_fov_rad] is the camera FOV in radians
+[detector] is an initialized Apriltag Detector object
+"""
 def get_tag(color_frame, depth_frame, x_fov_rad, detector):
     
     #initialize image
@@ -154,7 +161,8 @@ def get_tag(color_frame, depth_frame, x_fov_rad, detector):
     # Clculate depth of detected tags
     det = 1
     tag_l = [""]
-    R = 2
+    R = 1          # size of target to average, see get_depth
+	
     for tag in tag_detections:
         
         x, y = tag.center
@@ -176,10 +184,14 @@ def get_tag(color_frame, depth_frame, x_fov_rad, detector):
     return tag_l 
 
 
-""" Worker function for udp broadcast called in separate process
-    Reads data from Queue and broadcasts over udp
-    Computes delay from fresh data to time of transmission and 
-    adds it to the delay coming from the queue
+""" 
+udp_broadcast is a worker function for udp broadcast called in separate process
+Reads data from Queue and broadcasts over udp
+Computes delay from fresh data to time of transmission and 
+adds it to the delay coming from the queue
+[camera] is a boolean thats is True if the camera is present
+[Host_IP] is the IP of the host PC controlling the robot
+[queue] is a multiprocessing queue object containing data to broadcast
 """
 def udp_broadcast(camera, Host_IP, UDP_Port, queue):
     
@@ -222,10 +234,12 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
         s.close()
 
 
-""" Camera function to be called in a separate process 
-    Sets up the camera stream and aligns images
-    Sets up and starts the UDP broadcasting processes
-    Calls Tag and Dist functions and writes the data into the queue 
+""" 
+camera_worker is the Camera control function to be called in a separate process 
+Sets up the camera stream and aligns images
+Sets up and starts the UDP broadcasting processes
+Calls Tag and Distance functions and writes the data into the queue
+[Host_IP] is the IP of the host PC controlling the robot
 """
 def camera_worker(Host_IP):
     
@@ -234,7 +248,7 @@ def camera_worker(Host_IP):
     Tag_UDP_Port = 8844
    
     #Initialize apriltag detector
-    detector = apriltag.Detector(searchpath=_get_demo_searchpath())
+    detector = apriltag.Detector(searchpath=get_searchpath())
 
     #create queues
     tag_queue = multiprocessing.SimpleQueue()
@@ -330,11 +344,12 @@ def camera_worker(Host_IP):
             pipeline.stop() 
 
 
-"""[main()] first establishes connection with host computer. Once the TCPIP
-	connection is established, the function starts the camera in a separate process.
-    Any exceptions caught in this function would cause the program to terminate. 
-	Once all connections are set, the function listens to commands from the host 
-    computer MATLAB toolbox and sends them to the robot, then sends the reply back to the host
+"""
+main first establishes connection with thehost computer. Once the TCPIP
+connection is established, the function starts the camera control process.
+Any exceptions caught in this function would cause the program to terminate. 
+once all connections are set, the function listens to commands from the host 
+computer and sends them to the robot, then sends the reply back to the host
 """
 def main():
 
@@ -347,24 +362,23 @@ def main():
         quit()
 
     # Configure communication
-    TCP_IP = get_ip()
-    print('Raspberry Pi address: ' + TCP_IP)
+    my_IP = get_ip()
+    print('Raspberry Pi address: ' + my_IP)
     TCP_PORT = 8865
     BUFFER_SIZE = 32
-    debug = False
     serialLock = _thread.allocate_lock()
     
 
     # Start the tcp socket
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind((TCP_IP, TCP_PORT))
+    s.bind((my_IP, TCP_PORT))
     s.listen(1)
     print("Waiting for connection with Host...")
 
     conn, addr = s.accept()
     Host_IP = addr[0]
-    print ('Host Computer address: ' + Host_IP)
+    print ('Connection set. Host Computer address: ' + Host_IP)
 
     # Start camera process  
     cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP,)) 
