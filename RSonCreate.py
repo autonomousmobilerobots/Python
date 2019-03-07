@@ -103,9 +103,9 @@ def get_depth(depth_frame, x_pixel, y_pixel, R):
 
         # sum and divide to get the average
         sum = 0
-        for y in range(bottom, top):
+        for j in range(bottom, top):
            for k in range(left, right):
-               sum += depth_frame.get_distance(k, y)
+               sum += depth_frame.get_distance(k, j)
         
         return sum/num_of_pixels
 
@@ -158,28 +158,31 @@ def get_tag(color_frame, depth_frame, x_fov_rad, detector):
     if len(tag_detections) == 0:
         return ["", "no tags detected"]
  	
-    # Clculate depth of detected tags
-    det = 1
+    # Calculate data for the detected tags
+    detNum = 1
     tag_l = [""]
     R = 1          # size of target to average, see get_depth
 	
     for tag in tag_detections:
         
-        x, y = tag.center
+        center_x, center_y = tag.center
         id = tag.tag_id
         
-        z_depth = get_depth(depth_frame, int(x), int(y), R)
-        px_to_m = z_depth*math.tan(x_fov_rad/2)/320
-        x_depth = (320-x)*px_to_m
+        # Depth to tag center
+        tag_z = get_depth(depth_frame, int(center_x), int(center_y), R)
         
-        # Add to the list
-        tag_l.append(str(det))
+        # Calculate X
+        px_to_m = tag_z*math.tan(x_fov_rad/2)/320
+        tag_x = (320-center_x)*px_to_m
+        
+        # Add tag information to the list
+        tag_l.append(str(detNum))
         tag_l.append(str(id))
-        tag_l.append(str(z_depth)[0:6])
-        tag_l.append(str(x_depth)[0:6])
-        tag_l.append(str(0)[0:6])
+        tag_l.append(str(tag_z)[0:6])
+        tag_l.append(str(tag_x)[0:6])
+        tag_l.append(str(0)[0:6]) # not calculting yaw but leaving this here so the Matlab function doesn't change
 
-        det+=1
+        detNum+=1
     
     return tag_l 
 
@@ -215,19 +218,27 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
                     comp_dt = float(data_l[0])
                     
             
-                # calculate additional delay from queue update 
+                # Calculate additional delay from queue update 
                 queue_dt = time.time()-queue_start
                 total_dt = str(comp_dt + queue_dt) 
                 data_l[0] = total_dt[0:6]
+                
+                # Build packet to broadcast
                 data = ' '.join(data_l)
-            
-                #broadcast
-                s.sendto(str.encode(data), (Host_IP, UDP_Port))
+                packet = str.encode(data)
+               
             else:
                 # Tell the host there is no camera, and sleep a little
-                s.sendto(bytes([99]), (Host_IP, UDP_Port))
+                packet = bytes([99])
                 time.sleep(1)
-
+            
+            # Broadcast
+            s.sendto(packet, (Host_IP, UDP_Port))
+    
+    except socket.error:
+        # Turn off green LED
+        os.system("echo none > /sys/class/leds/led0/trigger")
+    
     finally:
         
         #close UDP port
@@ -345,7 +356,7 @@ def camera_worker(Host_IP):
 
 
 """
-main first establishes connection with thehost computer. Once the TCPIP
+main first establishes connection with the host computer. Once the TCPIP
 connection is established, the function starts the camera control process.
 Any exceptions caught in this function would cause the program to terminate. 
 once all connections are set, the function listens to commands from the host 
@@ -383,6 +394,9 @@ def main():
     # Start camera process  
     cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP,)) 
     cam_process.start() 
+ 
+    # Heartbeat on green LED
+    os.system("echo heartbeat > /sys/class/leds/led0/trigger")
 
     try:
         
@@ -409,15 +423,22 @@ def main():
                 #Read data from robot and send to Host
                 BytesToRead = ser_port.inWaiting()
                 if BytesToRead:
-                    x = ser_port.read(BytesToRead)
-                    conn.send(x)
+                    packet = ser_port.read(BytesToRead)
+                    conn.send(packet)
+    
+    except socket.error:
+        quit()
 
     finally:
-        print("I was told to Stop, or something went wrong")
+        # Turn off green LED
+        os.system("echo none > /sys/class/leds/led0/trigger")
+        
+        print("Received a Shutdown command, or something went wrong")
         
         #close TCP connection
         conn.shutdown(1)
         conn.close()
+        s.shutdown(1)
         s.close()
         #close the serial connection
         ser_port.close()
