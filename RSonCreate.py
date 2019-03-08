@@ -47,6 +47,24 @@ def send_message(data, ser_port, serialLock):
     #release the mutex lock
     serialLock.release()
 
+""" 
+get_ip returns the robot name based on the IP address
+"""
+def get_robot_name(IP):
+
+    if   IP == "128.253.194.117": return "Test-Pi"
+    elif IP == "10.253.194.101" : return "WallE"
+    elif IP == "10.253.194.102" : return "EVE"
+    elif IP == "10.253.194.103" : return "R2D2"    
+    elif IP == "10.253.194.104" : return "BB8"
+    elif IP == "10.253.194.105" : return "C3PO"    
+    elif IP == "10.253.194.106" : return "Dotmatrix"
+    elif IP == "10.253.194.107" : return "Max"    
+    elif IP == "10.253.194.108" : return "Baymax"
+    elif IP == "10.253.194.109" : return "Rachel"    
+    elif IP == "10.253.194.110" : return "Motoko"
+    else                        : return "Unknown"    
+
 
 """ 
 get_ip returns the local DHCP assigned IP
@@ -207,7 +225,7 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
         queue_start = 0
         data_l = ['0', '0']
  
-        while 1:
+        while True:
             
             if camera:  
                 # if there is new data in the queue read it
@@ -240,7 +258,7 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
         os.system("echo none > /sys/class/leds/led0/trigger")
     
     finally:
-        
+        print("Stopping UDP Process!")
         #close UDP port
         s.close()
 
@@ -266,7 +284,7 @@ def camera_worker(Host_IP):
     dist_queue = multiprocessing.SimpleQueue()
  
     # Configure depth and color streams
-    print ("waiting for camera...")
+    print ("Initializing camera...")
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
@@ -309,50 +327,40 @@ def camera_worker(Host_IP):
     dist_data_l = [""]
     tag_data_l = [""]
     
-    try:
-        
-        while 1:
     
-            if camera==True:
-                
-                frames = pipeline.wait_for_frames()
-                cam_start = time.time() 
-               
-                #align frames
-                aligned_frames = align.process(frames)
-                color_frame = aligned_frames.get_color_frame()
-                depth_frame = aligned_frames.get_depth_frame()
-
-                if not color_frame or not depth_frame:
-                    continue
- 
-                # Call distance function, add delay and write to queue
-                dist_data_l = get_distance(depth_frame)
-                dist_dt = str(time.time()-cam_start)
-                dist_data_l[0] = dist_dt[0:6]
-                dist_queue.put(dist_data_l)
-                
-                # Call tag function, add delay and write to queue
-                tag_data_l = get_tag(color_frame, depth_frame, x_fov_rad, detector)
-                tag_dt = str(time.time()-cam_start)
-                tag_data_l[0] = tag_dt[0:6]
-                tag_queue.put(tag_data_l)
-            
-            # No camera - sleep to reduce load
-            else:
-                time.sleep(1)
-
-    finally:
         
-        # Terminte broadcasting processes
-        tag_broadcast.terminate()
-        tag_broadcast.join()
-        dist_broadcast.terminate()
-        dist_broadcast.join()
-        
-        # Stop camera
+    while True:
+    
         if camera==True:
-            pipeline.stop() 
+                
+            frames = pipeline.wait_for_frames()
+            cam_start = time.time() 
+               
+            #align frames
+            aligned_frames = align.process(frames)
+            color_frame = aligned_frames.get_color_frame()
+            depth_frame = aligned_frames.get_depth_frame()
+
+            if not color_frame or not depth_frame:
+                continue
+ 
+            # Call distance function, add delay and write to queue
+            dist_data_l = get_distance(depth_frame)
+            dist_dt = str(time.time()-cam_start)
+            dist_data_l[0] = dist_dt[0:6]
+            dist_queue.put(dist_data_l)
+                
+            # Call tag function, add delay and write to queue
+            tag_data_l = get_tag(color_frame, depth_frame, x_fov_rad, detector)
+            tag_dt = str(time.time()-cam_start)
+            tag_data_l[0] = tag_dt[0:6]
+            tag_queue.put(tag_data_l)
+            
+        # No camera - sleep to reduce load
+        else:
+            time.sleep(1)
+
+   
 
 
 """
@@ -363,88 +371,103 @@ once all connections are set, the function listens to commands from the host
 computer and sends them to the robot, then sends the reply back to the host
 """
 def main():
-
-    try:
-        # Set the output serial property for create
-        ser_port = serial.Serial("/dev/ttyUSB0", baudrate=57600, timeout=0.5)
-        print ("Serial port set!")
-    except:
-        print ("Serial port not connected")
-        quit()
-
-    # Configure communication
-    my_IP = get_ip()
-    print('Raspberry Pi address: ' + my_IP)
+    
     TCP_PORT = 8865
     BUFFER_SIZE = 32
     serialLock = _thread.allocate_lock()
-    
 
-    # Start the tcp socket
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    s.bind((my_IP, TCP_PORT))
-    s.listen(1)
-    print("Waiting for connection with Host...")
+    # Configure communication
+    my_IP = get_ip()
+    print("Hello! My name is " + get_robot_name(my_IP) + ". My Raspberry Pi address is: " + my_IP)
 
-    conn, addr = s.accept()
-    Host_IP = addr[0]
-    print ('Connection set. Host Computer address: ' + Host_IP)
-
-    # Start camera process  
-    cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP,)) 
-    cam_process.start() 
- 
-    # Heartbeat on green LED
-    os.system("echo heartbeat > /sys/class/leds/led0/trigger")
-
+    # Configure serial port to Create
     try:
-        
-        print ("Ready for Commands!") 
-        while 1:
-            
-           # Check for command from the host
-            command = b''
-            dataAvail = select.select([conn],[],[],0.01)[0]
-            if dataAvail:
-                command = (conn.recv(BUFFER_SIZE))
-                
-                if command == b'stop':
-                # The host computer asks to stop the script 
-                    quit()
-
-                else: 
-                # The host computer command is meant for the iRobot
-                # write data to serial port
-                    send_message(command, ser_port, serialLock)
-            
-            # No command
-            else:       
-                #Read data from robot and send to Host
-                BytesToRead = ser_port.inWaiting()
-                if BytesToRead:
-                    packet = ser_port.read(BytesToRead)
-                    conn.send(packet)
-    
-    except socket.error:
+        ser_port = serial.Serial("/dev/ttyUSB0", baudrate=57600, timeout=0.5)
+        print ("Serial port to Create is set!")
+    except:
+        print ("Serial port to Create is not connected. Stopping!")
         quit()
+    
+    # Start the tcp socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind((my_IP, TCP_PORT))
+        s.listen(1)
+        print("Waiting for TCP connection with Host...")
 
+        # Create new socket bound to the port
+        conn, addr = s.accept()
+        Host_IP = addr[0]
+        print ('TCP Port set. Host Computer address: ' + Host_IP)
+    
+       #Close the original socket 
+        s.shutdown(1)
+        s.close()
+    
+    except:
+        print("Could not open TCP Port")
+        quit()  
+    
+    else:
+    
+        # Start camera process  
+        cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP,)) 
+        cam_process.start() 
+ 
+        # Heartbeat on green LED
+        os.system("echo heartbeat > /sys/class/leds/led0/trigger")
+
+        print ("Ready for Commands!")
+
+        try:
+        
+            while True:
+            
+               # Check for command from the host
+                command = b''
+                dataAvail = select.select([conn],[],[],0.01)[0]
+                if dataAvail:
+                    command = (conn.recv(BUFFER_SIZE))
+                
+                    if command == b'stop':
+                    # The host computer asks to stop the script 
+                        print("Received a Shutdown command from Host")
+                        break
+
+                    else: 
+                    # The host computer command is meant for the iRobot
+                    # write data to serial port
+                        send_message(command, ser_port, serialLock)
+            
+                # No command
+                else:       
+                    #Read data from robot and send to Host
+                    BytesToRead = ser_port.inWaiting()
+                    if BytesToRead:
+                        packet = ser_port.read(BytesToRead)
+                        conn.send(packet)
+    
+        except:
+            print("Problems communicating with the Create")
+        
     finally:
         # Turn off green LED
         os.system("echo none > /sys/class/leds/led0/trigger")
         
-        print("Received a Shutdown command, or something went wrong")
+        print("Stopping!")
         
-        #close TCP connection
+        # Close the serial connection
+        ser_port.close()
+        
+        # Terminate the camera process
+        cam_process.terminate()
+        cam_process.join(timeout=1)
+        
+        # Close TCP connection
         conn.shutdown(1)
         conn.close()
-        s.shutdown(1)
-        s.close()
-        #close the serial connection
-        ser_port.close()
-        #kill the camera process
-        cam_process.terminate()
-        cam_process.join()
 
 
+# Let's go
 main()
