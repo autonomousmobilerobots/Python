@@ -7,7 +7,6 @@ Script 'PyUpdate' sits in the home folder. Run ./PyUpdtae to get the current RSo
 
 The other scripts are written in Python and sit in /apriltag/python/     
 
-Robot_controller* are older versions no longer updated.
+Robot_controller*.py are older versions no longer updated.
 
-RSonCreate is the current script
-
+RSonCreate.py is the current script.
