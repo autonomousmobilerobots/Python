@@ -1,6 +1,9 @@
-#script to Update RSonCreate.py from Git
+# Script to Update RSonCreate.py from Git
+# Need to be on routable IP and not on 10-space
+# connect ethernet cable and SSH to wired IP to run this
 
+sudo ifdown wlan0
 cd apriltag/python
 rm RSonCreate.py
 wget https://raw.githubusercontent.com/autonomousmobilerobots/RaspberryPi/master/RSonCreate.py
-cd ~
+sudo ifup wlan0
