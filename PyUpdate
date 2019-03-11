@@ -1,0 +1,6 @@
+#script to Update RSonCreate.py from Git
+
+cd apriltag/python
+rm RSonCreate.py
+wget https://raw.githubusercontent.com/autonomousmobilerobots/RaspberryPi/master/RSonCreate.py
+cd ~
