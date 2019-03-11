@@ -48,7 +48,7 @@ def send_message(data, ser_port, serialLock):
     serialLock.release()
 
 """ 
-get_ip returns the robot name based on the IP address
+get_robot_name returns the robot name based on the IP address
 """
 def get_robot_name(IP):
 
