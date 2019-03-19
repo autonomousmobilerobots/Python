@@ -53,7 +53,7 @@ get_robot_name returns the robot name based on the IP address
 def get_robot_name(IP):
 
     if   IP == "128.253.194.117": return "Test-Pi"
-    elif IP == "10.253.194.101" : return "WallE"
+    elif IP == "10.253.194.101" : return "Wall-E"
     elif IP == "10.253.194.102" : return "EVE"
     elif IP == "10.253.194.103" : return "R2D2"    
     elif IP == "10.253.194.104" : return "BB8"
@@ -84,7 +84,7 @@ def get_ip():
 
 
 """
-get_depth calculates the average depth aaround a target pixel
+get_depth calculates the average depth around a target pixel
 [depth_frame] is a 640x480 Realsense depth frame
 [x_pixel] and [y_pixel] are the pixel coordinates to get depth for
 [R] determines the number of pixels around x,y that are used to get the average
@@ -432,17 +432,17 @@ def main():
                 
                     if command == b'stop':
                     # The host computer asks to stop the script 
-                        print("Received a Shutdown command from Host")
+                        print("Received a Stop command from Host")
                         break
 
                     else: 
-                    # The host computer command is meant for the iRobot
-                    # write data to serial port
+                    # The host computer command is meant for the iRobot Create
+                    # write command to the serial port
                         send_message(command, ser_port, serialLock)
             
                 # No command
                 else:       
-                    #Read data from robot and send to Host
+                    #If there is data from the robot, send it to the Host computer
                     BytesToRead = ser_port.inWaiting()
                     if BytesToRead:
                         packet = ser_port.read(BytesToRead)
