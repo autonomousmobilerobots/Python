@@ -53,7 +53,7 @@ get_robot_name returns the robot name based on the IP address
 def get_robot_name(IP):
 
     if   IP == "128.253.194.117": return "Test-Pi"
-    elif IP == "10.253.194.101" : return "Wall-E"
+    elif IP == "10.253.194.101" : return "WallE"
     elif IP == "10.253.194.102" : return "EVE"
     elif IP == "10.253.194.103" : return "R2D2"    
     elif IP == "10.253.194.104" : return "BB8"
@@ -84,7 +84,7 @@ def get_ip():
 
 
 """
-get_depth calculates the average depth around a target pixel
+get_depth calculates the average depth aaround a target pixel
 [depth_frame] is a 640x480 Realsense depth frame
 [x_pixel] and [y_pixel] are the pixel coordinates to get depth for
 [R] determines the number of pixels around x,y that are used to get the average
@@ -269,20 +269,11 @@ Sets up the camera stream and aligns images
 Sets up and starts the UDP broadcasting processes
 Calls Tag and Distance functions and writes the data into the queue
 [Host_IP] is the IP of the host PC controlling the robot
+[Tag_On] is 1 when tag functionality is required, otherwise 0
+[Depth_On] is 1 when Depth functionality is required, otherwise 0
 """
-def camera_worker(Host_IP):
+def camera_worker(Host_IP, Tag_On, Depth_On):
     
-    #configure UDP ports
-    Dist_UDP_Port = 8833
-    Tag_UDP_Port = 8844
-   
-    #Initialize apriltag detector
-    detector = apriltag.Detector(searchpath=get_searchpath())
-
-    #create queues
-    tag_queue = multiprocessing.SimpleQueue()
-    dist_queue = multiprocessing.SimpleQueue()
- 
     # Configure depth and color streams
     print ("Initializing camera...")
     pipeline = rs.pipeline()
@@ -299,12 +290,14 @@ def camera_worker(Host_IP):
         print ("Camera not connected!")
         camera = False   
     
-    #align depth and color images
-    align_to = rs.stream.color
-    align = rs.align(align_to)
 
     #Get the camera parameters from the RealSense
-    if camera==True:
+    if camera:
+        
+        #align depth and color images
+        align_to = rs.stream.color
+        align = rs.align(align_to)
+        
         profile = pipeline.get_active_profile()
         rgb_profile = rs.video_stream_profile(profile.get_stream(rs.stream.color))
         rgb_intrinsics = rgb_profile.get_intrinsics()
@@ -315,23 +308,51 @@ def camera_worker(Host_IP):
         x_fov_rad = math.radians((fov)[0])
  
 
-    #start the broadcasting processes
-    tag_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,Tag_UDP_Port, tag_queue))
-    tag_broadcast.daemon = True
-    tag_broadcast.start() 
-    
-    dist_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,Dist_UDP_Port, dist_queue)) 
-    dist_broadcast.daemon = True
-    dist_broadcast.start() 
+    if Tag_On:
 
-    dist_data_l = [""]
-    tag_data_l = [""]
-    
-    
+        if camera: 
+            print ("Tag functionality is ON")
+
+        #configure UDP port
+        Tag_UDP_Port = 8844
+
+        #Initialize apriltag detector
+        detector = apriltag.Detector(searchpath=get_searchpath())
         
+        # Create Queue
+        tag_queue = multiprocessing.SimpleQueue()
+
+        # Start the broadcasting process
+        tag_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,Tag_UDP_Port, tag_queue))
+        tag_broadcast.daemon = True
+        tag_broadcast.start() 
+        tag_data_l = [""]
+    else: 
+        print ("Tag functionality is OFF")
+
+    if Depth_On:
+        
+        if camera: 
+            print ("Depth functionality is ON")
+
+        #configure UDP port
+        Dist_UDP_Port = 8833
+    
+        # Create Queue    
+        dist_queue = multiprocessing.SimpleQueue()
+ 
+        # Start the broadcasting process
+        dist_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,Dist_UDP_Port, dist_queue)) 
+        dist_broadcast.daemon = True
+        dist_broadcast.start() 
+        dist_data_l = [""]
+    else: 
+        print ("Depth functionality is OFF")
+   
+
     while True:
     
-        if camera==True:
+        if camera:
                 
             frames = pipeline.wait_for_frames()
             cam_start = time.time() 
@@ -344,17 +365,21 @@ def camera_worker(Host_IP):
             if not color_frame or not depth_frame:
                 continue
  
-            # Call distance function, add delay and write to queue
-            dist_data_l = get_distance(depth_frame)
-            dist_dt = str(time.time()-cam_start)
-            dist_data_l[0] = dist_dt[0:6]
-            dist_queue.put(dist_data_l)
-                
-            # Call tag function, add delay and write to queue
-            tag_data_l = get_tag(color_frame, depth_frame, x_fov_rad, detector)
-            tag_dt = str(time.time()-cam_start)
-            tag_data_l[0] = tag_dt[0:6]
-            tag_queue.put(tag_data_l)
+            
+            if Tag_On:
+                # Call tag function, add delay and write to queue
+                tag_data_l = get_tag(color_frame, depth_frame, x_fov_rad, detector)
+                tag_dt = str(time.time()-cam_start)
+                tag_data_l[0] = tag_dt[0:6]
+                tag_queue.put(tag_data_l)
+
+            if Depth_On:
+                # Call distance function, add delay and write to queue
+                dist_data_l = get_distance(depth_frame)
+                dist_dt = str(time.time()-cam_start)
+                dist_data_l[0] = dist_dt[0:6]
+                dist_queue.put(dist_data_l)
+                            
             
         # No camera - sleep to reduce load
         else:
@@ -401,20 +426,31 @@ def main():
         Host_IP = addr[0]
         print ('TCP Port set. Host Computer address: ' + Host_IP)
     
-       #Close the original socket 
+        #Close the original socket 
         s.shutdown(1)
         s.close()
     
+        # Get Tag_On and Depth_On values from host
+        dataAvail = 0
+        while not dataAvail:    
+            dataAvail = select.select([conn],[],[],0.01)[0]
+        Init_packet = (conn.recv(BUFFER_SIZE))        
+        Tag_On = Init_packet[0]
+        Depth_On = Init_packet[1]
+
     except:
         print("Could not open TCP Port")
         quit()  
     
     else:
     
-        # Start camera process  
-        cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP,)) 
-        cam_process.start() 
- 
+        # Start camera process if required 
+        cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP, Tag_On, Depth_On)) 
+        if Tag_On or Depth_On:    
+            cam_process.start() 
+            time.sleep(2)
+        else:
+            print("Tag and Depth are OFF - Camera not used!")
         # Heartbeat on green LED
         os.system("echo heartbeat > /sys/class/leds/led0/trigger")
 
@@ -432,17 +468,17 @@ def main():
                 
                     if command == b'stop':
                     # The host computer asks to stop the script 
-                        print("Received a Stop command from Host")
+                        print("Received a Shutdown command from Host")
                         break
 
                     else: 
-                    # The host computer command is meant for the iRobot Create
-                    # write command to the serial port
+                    # The host computer command is meant for the iRobot
+                    # write data to serial port
                         send_message(command, ser_port, serialLock)
             
                 # No command
                 else:       
-                    #If there is data from the robot, send it to the Host computer
+                    #Read data from robot and send to Host
                     BytesToRead = ser_port.inWaiting()
                     if BytesToRead:
                         packet = ser_port.read(BytesToRead)
@@ -461,8 +497,9 @@ def main():
         ser_port.close()
         
         # Terminate the camera process
-        cam_process.terminate()
-        cam_process.join(timeout=1)
+        if cam_process.is_alive():
+            cam_process.terminate()
+            cam_process.join(timeout=1)
         
         # Close TCP connection
         conn.shutdown(1)
