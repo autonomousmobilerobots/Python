@@ -288,25 +288,20 @@ def camera_worker(Host_IP, Tag_On, Depth_On):
         camera = True
     except: 
         print ("Camera not connected!")
-        camera = False   
-    
-
-    #Get the camera parameters from the RealSense
-    if camera:
-        
+        camera = False  
+    else:
         #align depth and color images
         align_to = rs.stream.color
         align = rs.align(align_to)
-        
+	
+        #Get the camera parameters from the RealSense
         profile = pipeline.get_active_profile()
         rgb_profile = rs.video_stream_profile(profile.get_stream(rs.stream.color))
         rgb_intrinsics = rgb_profile.get_intrinsics()
-        #params = [rgb_intrinsics.fx, rgb_intrinsics.fy, 0, 0]
-        
+                
         # get FOV from the camera
         fov= rs.rs2_fov(rgb_intrinsics)
-        x_fov_rad = math.radians((fov)[0])
- 
+        x_fov_rad = math.radians((fov)[0]) 
 
     if Tag_On:
 
