@@ -436,24 +436,24 @@ def main():
                         break
 
                     # Debug only, not used in lab, send full image to host
-                    elif data == b'color':
+                    #elif data == b'color':
                         # The host computer asks for the current image from the camera
-                        if camera == False:
-                            print("No camera connected, cannot call this function")
-                            conn.send(bytes([99]))                    
-                            continue
+                        #if camera == False:
+                            #print("No camera connected, cannot call this function")
+                            #conn.send(bytes([99]))                    
+                            #continue
 
-                        frames = pipeline.wait_for_frames()
-                        aligned_frames = align.process(frames)
-                        color_frame = aligned_frames.get_color_frame()
-                        color_image = np.asanyarray(color_frame.get_data())
-                        pil_image = Image.fromarray(color_image)
+                        #frames = pipeline.wait_for_frames()
+                        #aligned_frames = align.process(frames)
+                        #color_frame = aligned_frames.get_color_frame()
+                        #color_image = np.asanyarray(color_frame.get_data())
+                        #pil_image = Image.fromarray(color_image)
                         #Convert to grayscale image before sending to host computer
-                        gray = np.array(pil_image.convert('L'))
+                        #gray = np.array(pil_image.convert('L'))
 
-                        for i in range(480):
-                            for j in range(640): 
-                                conn.send(gray[i, j])
+                        #for i in range(480):
+                            #for j in range(640): 
+                                #conn.send(gray[i, j])
                     # End Debug only
 
                     else:
