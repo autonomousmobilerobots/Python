@@ -1,5 +1,7 @@
-# Script to Update RSonCreate.py from Git
+# Script to Update RSonCreate.py and robot_controller.py from Git
 
 cd apriltag/python
 rm RSonCreate.py
+rm robot_controller.py
 wget https://raw.githubusercontent.com/autonomousmobilerobots/RaspberryPi/master/RSonCreate.py
+wget https://raw.githubusercontent.com/autonomousmobilerobots/RaspberryPi/master/robot_controller.py
