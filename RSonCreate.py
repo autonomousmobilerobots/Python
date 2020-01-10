@@ -455,14 +455,14 @@ def main():
                             for j in range(640): 
                                 conn.send(gray[i, j])
                     # End Debug only
-		    
+
                     else:
                     # The host computer command is meant for the iRobot Create
                     # write command to the serial port
                         send_message(command, ser_port, serialLock)
-            
+                
                 # No command
-                else:       
+                else:
                     #If there is data from the robot, send it to the Host computer
                     BytesToRead = ser_port.inWaiting()
                     if BytesToRead:
