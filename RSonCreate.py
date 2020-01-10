@@ -437,7 +437,7 @@ def main():
 
 		    # Debug only, not used in lab, send full image to host
 		    elif data == b'color':
-			# Case where the host computer asks the current image from the camera
+		        # Case where the host computer asks the current image from the camera
                         if camera==False:
                         print("No camera connected, cannot call this function")
                         conn.send(bytes([99]))                    
@@ -448,7 +448,7 @@ def main():
                         color_frame = aligned_frames.get_color_frame()
                         color_image = np.asanyarray(color_frame.get_data())
                         pil_image = Image.fromarray(color_image)
-			#Convert to grayscale image before sending to host computer
+		        #Convert to grayscale image before sending to host computer
                         gray = np.array(pil_image.convert('L'))
 
                         for i in range(480):
