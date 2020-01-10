@@ -1,4 +1,16 @@
-# Script to Update RSonCreate.py and robot_controller.py from Git
+# Script to Update four files from Git:
+# robot 
+# debug
+# RSonCreate.py
+# robot_controller.py
+
+rm robot
+wget https://raw.githubusercontent.com/autonomousmobilerobots/RaspberryPi/master/robot
+chmod +x robot
+
+rm debug
+wget https://raw.githubusercontent.com/autonomousmobilerobots/RaspberryPi/master/debug
+chmod +x debug
 
 cd apriltag/python
 rm RSonCreate.py
