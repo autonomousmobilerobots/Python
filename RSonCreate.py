@@ -456,7 +456,7 @@ def main():
                                 conn.send(gray[i, j])
                     # End Debug only
 		    
-	            else: 
+                    else: 
                     # The host computer command is meant for the iRobot Create
                     # write command to the serial port
                         send_message(command, ser_port, serialLock)
