@@ -439,9 +439,9 @@ def main():
                     elif data == b'color':
                         # The host computer asks for the current image from the camera
                         if camera==False:
-                        print("No camera connected, cannot call this function")
-                        conn.send(bytes([99]))                    
-                        continue
+                            print("No camera connected, cannot call this function")
+                            conn.send(bytes([99]))                    
+                            continue
 
                         frames = pipeline.wait_for_frames()
                         aligned_frames = align.process(frames)
