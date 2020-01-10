@@ -438,7 +438,7 @@ def main():
                     # Debug only, not used in lab, send full image to host
                     elif data == b'color':
                         # The host computer asks for the current image from the camera
-                        if camera==False:
+                        if camera == False:
                             print("No camera connected, cannot call this function")
                             conn.send(bytes([99]))                    
                             continue
