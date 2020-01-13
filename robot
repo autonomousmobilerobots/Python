@@ -1,5 +1,5 @@
 #!/bin/bash
-# bash script for starting robot controller code
+# bash script for starting robot controller code in lab mode
 
 SCRIPTPATH=/home/create/apriltag/python/RSonCreate.py
 
