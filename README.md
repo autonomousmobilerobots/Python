@@ -11,3 +11,5 @@ Trobot_controller.py and RSonCreate.py are Python scripts that sit in /apriltag/
 robot_controller.py is used for debug. it gives access to grayscale and depth images as well as commanding the create.
 
 RSonCreate.py is the script used in lab.
+
+robot_controller_udp.py and robot_controller_udp_MP.py are older versions not currently used.
