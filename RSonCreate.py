@@ -220,7 +220,7 @@ def udp_broadcast(camera, Host_IP, UDP_Port_Type, queue):
     Tag_UDP_Port_Number = 8844
 
     try:
-
+        
         #configure udp port
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         print(UDP_Port_Type + " UDP Port is Set")
