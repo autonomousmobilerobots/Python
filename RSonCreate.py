@@ -436,7 +436,7 @@ def main():
                 
                     if command == b'stop':
                     # The host computer asks to stop the script 
-                        print("Received a Stop command from Host")
+                        print("\nReceived a Stop command from Host")
                         break
 
                     else:
