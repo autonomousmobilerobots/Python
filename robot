@@ -3,5 +3,5 @@
 
 SCRIPTPATH=/home/create/apriltag/python/RSonCreate.py
 
-echo "Starting robot script..."
+#echo "Starting robot script..."
 sudo nice -n -5 python3 $SCRIPTPATH
