@@ -214,12 +214,16 @@ adds it to the delay coming from the queue
 [Host_IP] is the IP of the host PC controlling the robot
 [queue] is a multiprocessing queue object containing data to broadcast
 """
-def udp_broadcast(camera, Host_IP, UDP_Port, queue):
+def udp_broadcast(camera, Host_IP, UDP_Port_Type, queue):
     
+    Dist_UDP_Port_Number = 8833
+    Tag_UDP_Port_Number = 8844
+
     try:
 
         #configure udp port
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	print(UDP_Port_Type + " UDP Port is Set")
         
         comp_dt = 0
         queue_start = 0
@@ -251,11 +255,15 @@ def udp_broadcast(camera, Host_IP, UDP_Port, queue):
                 time.sleep(1)
             
             # Broadcast
-            s.sendto(packet, (Host_IP, UDP_Port))
+	    if UDP_Port_Type == "Tag":
+                s.sendto(packet, (Host_IP, Tag_UDP_Port_Number))
+	    if UDP_Port_Type == "Dist":
+		s.sendto(packet, (Host_IP, Dist_UDP_Port_Number))
     
     except socket.error:
         # Turn off green LED
         os.system("echo none > /sys/class/leds/led0/trigger")
+	print("Could Not Set " + UDP_Port_Type + " UDP Port")
     
     finally:
         print("Stopping UDP Process!")
@@ -272,10 +280,6 @@ Calls Tag and Distance functions and writes the data into the queue
 """
 def camera_worker(Host_IP):
     
-    #configure UDP ports
-    Dist_UDP_Port = 8833
-    Tag_UDP_Port = 8844
-   
     #Initialize apriltag detector
     detector = apriltag.Detector(searchpath=get_searchpath())
 
@@ -316,11 +320,11 @@ def camera_worker(Host_IP):
  
 
     #start the broadcasting processes
-    tag_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,Tag_UDP_Port, tag_queue))
+    tag_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,"Tag", tag_queue))
     tag_broadcast.daemon = True
     tag_broadcast.start() 
     
-    dist_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,Dist_UDP_Port, dist_queue)) 
+    dist_broadcast = multiprocessing.Process(target=udp_broadcast, args=(camera, Host_IP,"Dist", dist_queue)) 
     dist_broadcast.daemon = True
     dist_broadcast.start() 
 
