@@ -223,7 +223,7 @@ def udp_broadcast(camera, Host_IP, UDP_Port_Type, queue):
 
         #configure udp port
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-	print(UDP_Port_Type + " UDP Port is Set")
+        print(UDP_Port_Type + " UDP Port is Set")
         
         comp_dt = 0
         queue_start = 0
@@ -256,14 +256,14 @@ def udp_broadcast(camera, Host_IP, UDP_Port_Type, queue):
             
             # Broadcast
 	    if UDP_Port_Type == "Tag":
-                s.sendto(packet, (Host_IP, Tag_UDP_Port_Number))
+            s.sendto(packet, (Host_IP, Tag_UDP_Port_Number))
 	    if UDP_Port_Type == "Dist":
-		s.sendto(packet, (Host_IP, Dist_UDP_Port_Number))
+            s.sendto(packet, (Host_IP, Dist_UDP_Port_Number))
     
     except socket.error:
         # Turn off green LED
         os.system("echo none > /sys/class/leds/led0/trigger")
-	print("Could Not Set " + UDP_Port_Type + " UDP Port")
+        print("Could Not Set " + UDP_Port_Type + " UDP Port")
     
     finally:
         print("Stopping UDP Process!")
