@@ -255,11 +255,11 @@ def udp_broadcast(camera, Host_IP, UDP_Port_Type, queue):
                 time.sleep(1)
             
             # Broadcast
-	    if UDP_Port_Type == "Tag":
-            s.sendto(packet, (Host_IP, Tag_UDP_Port_Number))
-	    if UDP_Port_Type == "Dist":
-            s.sendto(packet, (Host_IP, Dist_UDP_Port_Number))
-    
+	        if UDP_Port_Type == "Tag":
+                s.sendto(packet, (Host_IP, Tag_UDP_Port_Number))
+	        if UDP_Port_Type == "Dist":
+                s.sendto(packet, (Host_IP, Dist_UDP_Port_Number))
+                
     except socket.error:
         # Turn off green LED
         os.system("echo none > /sys/class/leds/led0/trigger")
