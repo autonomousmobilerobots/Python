@@ -297,7 +297,7 @@ def camera_worker(Host_IP):
     # Start camera streaming
     try:
         pipeline.start(config)
-        print("Camera started and streaming!")
+        print("Camera started and streaming!\n")
         camera = True
     except: 
         print ("Camera not connected!")
@@ -382,14 +382,14 @@ def main():
 
     # Configure communication
     my_IP = get_ip()
-    print("Hello! My name is " + get_robot_name(my_IP) + ". My Raspberry Pi address is: " + my_IP)
+    print("Hello! My name is " + get_robot_name(my_IP) + ". My Raspberry Pi address is: " + my_IP + "\n")
 
     # Configure serial port to Create
     try:
         ser_port = serial.Serial("/dev/ttyUSB0", baudrate=57600, timeout=0.5)
-        print ("Serial port to Create is set!")
+        print ("Serial Port to Create is Set")
     except:
-        print ("Serial port to Create is not connected. Stopping!")
+        print ("Serial Port to Create is not connected. Stopping!")
         quit()
     
     # Start the tcp socket
@@ -398,12 +398,12 @@ def main():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((my_IP, TCP_PORT))
         s.listen(1)
-        print("Waiting for TCP connection with Host...")
+        #print("Waiting for TCP connection with Host...")
 
         # Create new socket bound to the port
         conn, addr = s.accept()
         Host_IP = addr[0]
-        print ('TCP Port set. Host Computer address: ' + Host_IP)
+        print ('TCP Port Set. Host Computer address: ' + Host_IP)
     
        #Close the original socket 
         s.shutdown(1)
@@ -414,7 +414,8 @@ def main():
         quit()  
     
     else:
-    
+        print ("Ready for Comands!\n")
+        
         # Start camera process  
         cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP,)) 
         cam_process.start() 
@@ -422,8 +423,7 @@ def main():
         # Heartbeat on green LED
         os.system("echo heartbeat > /sys/class/leds/led0/trigger")
 
-        print ("Ready for Commands!")
-
+        
         try:
         
             while True:
