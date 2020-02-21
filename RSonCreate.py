@@ -183,21 +183,20 @@ def get_tag(color_frame, depth_frame, x_fov_rad, detector):
 	
     for tag in tag_detections:
         
-        center_x, center_y = tag.center
-        id = tag.tag_id
+        h_center, v_center = tag.center #Center of detected tag
         
         # Depth to tag center
-        tag_z = get_depth(depth_frame, int(center_x), int(center_y), R)
+        tag_depth = get_depth(depth_frame, int(round(h_center)), int(round(v_center)), R)
         
-        # Calculate X
-        px_to_m = tag_z*math.tan(x_fov_rad/2)/320
-        tag_x = (320-center_x)*px_to_m
+        # Calculate Y from depth and camera fov
+        pixel_to_meters = tag_depth*math.tan(x_fov_rad/2)/320
+        tag_y = (320-h_center)*pixel_to_meters
         
         # Add tag information to the list
         tag_l.append(str(detNum))
-        tag_l.append(str(id))
-        tag_l.append(str(tag_z)[0:6])
-        tag_l.append(str(tag_x)[0:6])
+        tag_l.append(str(tag.tag_id))
+        tag_l.append(str(tag_depth)[0:6])
+        tag_l.append(str(tag_y)[0:6])
         tag_l.append(str(0)[0:6]) # not calculting yaw but leaving this here so the Matlab function doesn't change
 
         detNum+=1
