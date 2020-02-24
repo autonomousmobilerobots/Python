@@ -4,6 +4,10 @@
 # RSonCreate.py
 # robot_controller.py
 
+echo -e "\nUpdating:"
+domainname -A
+echo -e "\n"
+
 rm robot
 wget https://raw.githubusercontent.com/autonomousmobilerobots/RaspberryPi/master/robot
 chmod +x robot
