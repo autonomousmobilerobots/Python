@@ -49,22 +49,28 @@ def send_message(data, ser_port, serialLock):
 
 
 """ 
-get_Pi_info returns the local DHCP assigned IP and the Pi name
+get_IP returns the local DHCP assigned IP
 """
-def get_Pi_info():
+def get_IP():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # doesn't even have to be reachable
         s.connect(('10.255.255.255', 1))
         IP = s.getsockname()[0]
-        fqdn=socket.gethostbyaddr(IP)[0]
-        name=fqdn.split('.')[0]
     except:
         IP = '127.0.1.1'
     finally:
         s.close()
-    return (IP, name)
+    return IP
 
+
+""" 
+get_Name returns the host name from IP
+"""
+def get_Name(IP):
+    fqdn=socket.gethostbyaddr(IP)[0]
+    name=fqdn.split('.')[0]
+    return name
 
 """
 get_depth calculates the average depth around a target pixel
@@ -270,7 +276,7 @@ def camera_worker(Host_IP):
     dist_queue = multiprocessing.SimpleQueue()
  
     # Configure depth and color streams
-    print ("Initializing camera...")
+    print ("Initializing RealSense camera...")
     pipeline = rs.pipeline()
     config = rs.config()
     config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 30)
@@ -363,16 +369,15 @@ def main():
     serialLock = _thread.allocate_lock()
 
     # Configure communication
-    my_IP = get_Pi_info()[0]
-    my_Name = get_Pi_info()[1]
-    print("Hello! My name is " + my_Name + ". My Raspberry Pi address is: " + my_IP + "\n")
+    my_IP = get_IP()
+    print("Hello! My name is " + get_Name(my_IP) + "\n")
 
     # Configure serial port to Create
     try:
         ser_port = serial.Serial("/dev/ttyUSB0", baudrate=57600, timeout=0.5)
-        print ("Serial Port to Create is Set")
+        print ("Serial Port to the Create is Set")
     except:
-        print ("Serial Port to Create is not connected. Stopping!")
+        print ("Serial Port to the Create is not connected. Stopping!")
         quit()
     
     # Start the tcp socket
@@ -381,12 +386,11 @@ def main():
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind((my_IP, TCP_PORT))
         s.listen(1)
-        #print("Waiting for TCP connection with Host...")
 
         # Create new socket bound to the port
         conn, addr = s.accept()
         Host_IP = addr[0]
-        print ('TCP Port Set. Host Computer address: ' + Host_IP)
+        print ('TCP Port Configured With Lab Computer Name: ' + get_Name(Host_IP))
     
        #Close the original socket 
         s.shutdown(1)
@@ -397,7 +401,7 @@ def main():
         quit()  
     
     else:
-        print ("Ready for Comands!\n")
+        print ("Ready for Commands!\n")
         
         # Start camera process  
         cam_process=multiprocessing.Process(target=camera_worker, args=(Host_IP,)) 
@@ -419,7 +423,7 @@ def main():
                 
                     if command == b'stop':
                     # The host computer asks to stop the script 
-                        print("\nReceived a Stop command from Host")
+                        print("\nReceived a Stop command")
                         break
 
                     else:
@@ -442,7 +446,7 @@ def main():
         # Turn off green LED
         os.system("echo none > /sys/class/leds/led0/trigger")
         
-        print("Stopping!")
+        print("Stopping! Good Bye")
         
         # Close the serial connection
         ser_port.close()
