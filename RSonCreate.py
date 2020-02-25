@@ -49,7 +49,7 @@ def send_message(data, ser_port, serialLock):
 
 
 """ 
-get_ip returns the local DHCP assigned IP and the Pi name
+get_Pi_info returns the local DHCP assigned IP and the Pi name
 """
 def get_Pi_info():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
