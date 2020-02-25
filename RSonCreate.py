@@ -47,40 +47,23 @@ def send_message(data, ser_port, serialLock):
     #release the mutex lock
     serialLock.release()
 
-""" 
-get_robot_name returns the robot name based on the IP address
-"""
-def get_robot_name(IP):
-
-    if   IP == "128.253.194.117": return "Test-Pi"
-    elif IP == "10.253.194.101" : return "Wall-E"
-    elif IP == "10.253.194.102" : return "EVE"
-    elif IP == "10.253.194.103" : return "R2D2"    
-    elif IP == "10.253.194.104" : return "BB8"
-    elif IP == "10.253.194.105" : return "C3PO"    
-    elif IP == "10.253.194.106" : return "Dotmatrix"
-    elif IP == "10.253.194.107" : return "Max"    
-    elif IP == "10.253.194.108" : return "Baymax"
-    elif IP == "10.253.194.109" : return "Rachel"    
-    elif IP == "10.253.194.110" : return "Motoko"
-    else                        : return "Unknown"    
-
 
 """ 
-get_ip returns the local DHCP assigned IP
+get_ip returns the local DHCP assigned IP and the Pi name
 """
-def get_ip():
+def get_Pi_info():
     s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
         # doesn't even have to be reachable
         s.connect(('10.255.255.255', 1))
         IP = s.getsockname()[0]
+        fqdn=socket.gethostbyaddr(IP)[0]
+        name=fqdn.split('.')[0]
     except:
         IP = '127.0.1.1'
     finally:
         s.close()
-    return IP
-
+    return (IP, name)
 
 
 """
@@ -380,8 +363,9 @@ def main():
     serialLock = _thread.allocate_lock()
 
     # Configure communication
-    my_IP = get_ip()
-    print("Hello! My name is " + get_robot_name(my_IP) + ". My Raspberry Pi address is: " + my_IP + "\n")
+    my_IP = get_Pi_info()[0]
+    my_Name = get_Pi_info()[1]
+    print("Hello! My name is " + my_Name + ". My Raspberry Pi address is: " + my_IP + "\n")
 
     # Configure serial port to Create
     try:
